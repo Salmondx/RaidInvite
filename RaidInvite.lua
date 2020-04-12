@@ -71,7 +71,9 @@ function RaidInvite:Enable()
   self:ScheduleTimer("TimerTick", 60 * 30)
 
   -- notify guild
-  self:NotifyGuild()
+  if self.db.profile.announcement.enabled then
+    self:NotifyGuild()
+  end
 end
 
 function RaidInvite:Disable()
