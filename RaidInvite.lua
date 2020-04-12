@@ -114,15 +114,22 @@ end
 function RaidInvite:HandleMessage(playerName, text)
   local lcText = text:lower()
 
-  if not HasSearchWord(lcText) then return end
+  if not self:HasSearchWord(lcText) then return end
 
   local playerWithoutRealm, _ = playerName:gsub("-.*", '')
+
+  -- check to prevent invite of the addon owner
+  local selfName, _ = UnitName("player")
+  if selfName == playerWithoutRealm then
+    return
+  end
+  --
 
   self:Printf("|cffFF6347Invitation sent: %s|r", playerWithoutRealm)
   InviteUnit(playerName)
 end
 
-function HasSearchWord(text)
+function RaidInvite:HasSearchWord(text)
   local phrases = self.db.profile.phrases
   for i = 1,  #phrases do
     if text:match(phrases[i]) then return true end
