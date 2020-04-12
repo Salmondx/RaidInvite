@@ -3,21 +3,29 @@ local RaidInviteLDB = LibStub("LibDataBroker-1.1"):NewDataObject("RaidInvite", {
   type = "data source",
   text = "RaidInvite",
   icon = "Interface\\Icons\\Spell_ChargePositive",
-  OnClick = function() RaidInvite:Trigger() end,
+  OnClick = function(_, button) RaidInvite:OnClick(button) end,
   OnTooltipShow = function(tooltip) RaidInvite:Tooltip(tooltip) end,
 })
 local icon = LibStub("LibDBIcon-1.0")
+local AceGUI = LibStub("AceGUI-3.0")
 
 -- Global variables
 AUTO_INV_WORDS = {'invite', 'inv', '1', 'impact'}
+
+local defaults = {
+  profile = {
+    minimap = { hide = false },
+    phrases = { 'invite', 'inv', '1', 'impact' },
+    announcement = {
+      enabled = true,
+      phrase = "Raid Time! Type (#phrases) for invite!"
+    }
+  }
+}
 --
 function RaidInvite:OnInitialize()
   self:Print("Available commands: /rinv on | /rinv off")
-  self.db = LibStub("AceDB-3.0"):New("RaidInviteDB", {
-    profile = {
-      minimap = { hide = false }
-    }
-  })
+  self.db = LibStub("AceDB-3.0"):New("RaidInviteDB", defaults)
   self.enabled = false
   -- Register Minimap Icon
   icon:Register("RaidInviteLDB", RaidInviteLDB, self.db.profile.minimap)
@@ -30,6 +38,24 @@ function RaidInvite:HandleSlashInput(input)
     RaidInvite:Disable()
   else
     self:Print("Unknown command. Available options: on, off")
+  end
+end
+
+function RaidInvite:OnClick(button)
+  if button == 'LeftButton' then
+    return self:Trigger()
+  elseif button == 'RightButton' then
+    self:NotifyGuild()
+  elseif button == 'MiddleButton' then
+    self:ShowSettingsFrame()
+  end
+end
+
+function RaidInvite:Trigger()
+  if not self.enabled then
+    self:Enable()
+  else
+    self:Disable()
   end
 end
 
@@ -59,14 +85,6 @@ function RaidInvite:Disable()
   self:CancelAllTimers()
 end
 
-function RaidInvite:Trigger()
-  if not self.enabled then
-    self:Enable()
-  else
-    self:Disable()
-  end
-end
-
 -- Timer handler
 
 function RaidInvite:TimerTick()
@@ -79,6 +97,9 @@ end
 -- Minimap tooltip
 function RaidInvite:Tooltip(tooltip)
   tooltip:SetText("RaidInvite " .. (self.enabled and "Active" or "Disabled"))
+  tooltip:AddLine("Left Click - enable/disable")
+  tooltip:AddLine("Right Click - announce in guild chat")
+  tooltip:AddLine("Middle Click - show settings")
 end
 
 -- Chat parser
@@ -102,26 +123,96 @@ function RaidInvite:HandleMessage(playerName, text)
 end
 
 function HasSearchWord(text)
-  for i = 1, #AUTO_INV_WORDS do
-    if text:match(AUTO_INV_WORDS[i]) then return true end
+  local phrases = self.db.profile.phrases
+  for i = 1,  #phrases do
+    if text:match(phrases[i]) then return true end
   end
 
   return false
 end
 
 function RaidInvite:NotifyGuild()
-  local invitationList = '('
-  for i = 1, #AUTO_INV_WORDS do
-    if i == 1 then
-      invitationList = invitationList .. AUTO_INV_WORDS[i]
-    else
-      invitationList = invitationList .. ', ' .. AUTO_INV_WORDS[i]
-    end
-  end
-  invitationList = invitationList .. ')'
+  local phrasesMacro = self:GeneratePhraseMacro()
+  local announcementRaw = self.db.profile.announcement.phrase
+  local announcement = announcementRaw:gsub("#phrases", phrasesMacro)
+  SendChatMessage(announcement, "GUILD")
+end
 
-  SendChatMessage("Impact Raid Time! Type " .. invitationList .. " for invite!", "GUILD")
+function RaidInvite:GeneratePhraseMacro()
+  return self:PhrasesToString(', ')
 end
 
 -- Register Commands and Events
 RaidInvite:RegisterChatCommand("rinv", "HandleSlashInput")
+
+-- #####################################################################
+-- ######################## WIDGETS AND UI #############################
+-- #####################################################################
+
+function RaidInvite:ShowSettingsFrame()
+  local settingsFrame = AceGUI:Create("Frame")
+  settingsFrame:SetTitle("RaidInvite Settings")
+  settingsFrame:SetWidth(500)
+  settingsFrame:SetHeight(350)
+  settingsFrame:SetLayout("List")
+
+  local phrasesHeader = AceGUI:Create("Heading")
+  phrasesHeader:SetText("Invitation Phrases Settings")
+  phrasesHeader:SetFullWidth(true)
+  settingsFrame:AddChild(phrasesHeader)
+
+  local phrasesEdit = AceGUI:Create("MultiLineEditBox")
+  phrasesEdit:SetLabel("Invitation Phrases")
+  phrasesEdit:SetNumLines(6)
+  phrasesEdit:SetFullWidth(true)
+  phrasesEdit:SetText(self:PhrasesToString('\n'))
+  phrasesEdit:SetCallback("OnEnterPressed", function(widget, event, value) self:SavePhrases(value) end)
+  settingsFrame:AddChild(phrasesEdit)
+
+  local announceHeader = AceGUI:Create("Heading")
+  announceHeader:SetText("Guild Announcement Settings")
+  announceHeader:SetFullWidth(true)
+  settingsFrame:AddChild(announceHeader)
+
+  local announceCheckBox = AceGUI:Create("CheckBox")
+  announceCheckBox:SetLabel("Announce in guild chat on activation")
+  announceCheckBox:SetFullWidth(true)
+  announceCheckBox:SetValue(self.db.profile.announcement.enabled)
+  announceCheckBox:SetCallback("OnValueChanged", function(widget, event, value) self.db.profile.announcement.enabled = value end)
+  settingsFrame:AddChild(announceCheckBox)
+
+  local announcetEdit = AceGUI:Create("EditBox")
+  announcetEdit:SetLabel("Announcement phrase (#phrases to pretty print phrases above)")
+  announcetEdit:SetFullWidth(true)
+  announcetEdit:SetText(self.db.profile.announcement.phrase)
+  announcetEdit:SetCallback("OnEnterPressed", function(widget, event, text) self.db.profile.announcement.phrase = text end)
+  settingsFrame:AddChild(announcetEdit)
+
+end
+
+function RaidInvite:SavePhrases(text)
+  local phrases = {}
+  for s in text:gmatch("[^\r\n]+") do
+    -- trim string
+    s = s:gsub("%s+", "")
+    if s ~= nil or s ~= '' then
+      table.insert(phrases, s)
+    end
+  end
+
+  self.db.profile.phrases = phrases
+end
+
+function RaidInvite:PhrasesToString(separator)
+  local phrases = self.db.profile.phrases
+  local joinedPhrase = ''
+  for i = 1, #phrases do
+    if i == 1 then
+      joinedPhrase = joinedPhrase .. phrases[i]
+    else
+      joinedPhrase = joinedPhrase .. separator .. phrases[i]
+    end
+  end
+
+  return joinedPhrase
+end
