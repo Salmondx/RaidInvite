@@ -98,10 +98,10 @@ end
 
 -- Minimap tooltip
 function RaidInvite:Tooltip(tooltip)
-  tooltip:SetText("RaidInvite " .. (self.enabled and "Active" or "Disabled"))
-  tooltip:AddLine("Left Click - enable/disable")
-  tooltip:AddLine("Right Click - announce in guild chat")
-  tooltip:AddLine("Middle Click - show settings")
+  tooltip:SetText("RaidInvite " .. (self.enabled and "|cff32CD32Enabled|r" or "|cffFF0000Disabled|r"))
+  tooltip:AddLine("|cffA9A9A9Left Click:|r enable/disable")
+  tooltip:AddLine("|cffA9A9A9Right Click:|r announce in guild chat")
+  tooltip:AddLine("|cffA9A9A9Middle Click:|r show settings")
 end
 
 -- Chat parser
@@ -161,7 +161,7 @@ RaidInvite:RegisterChatCommand("rinv", "HandleSlashInput")
 function RaidInvite:ShowSettingsFrame()
   local settingsFrame = AceGUI:Create("Frame")
   settingsFrame:SetTitle("RaidInvite Settings")
-  settingsFrame:SetStatusText("RaidInvite 1.0.0 by Salmondx")
+  settingsFrame:SetStatusText("RaidInvite 1.0.1 by Salmondx")
   settingsFrame:SetWidth(500)
   settingsFrame:SetHeight(350)
   settingsFrame:SetLayout("List")

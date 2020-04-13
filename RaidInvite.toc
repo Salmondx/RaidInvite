@@ -2,7 +2,7 @@
 ## Title: RaidInvite
 ## Notes: Raid invitations from a guild chat
 ## Author: salmondx
-## Version: 1.0
+## Version: 1.0.1
 ## SavedVariables: RaidInviteDB
 
 embeds.xml
